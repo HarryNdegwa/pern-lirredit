@@ -7,6 +7,7 @@ import {
   Mutation,
   ObjectType,
   Resolver,
+  Query,
 } from "type-graphql";
 import { User } from "../entities/User";
 import argon2 from "argon2";
@@ -40,23 +41,19 @@ class UserResponse {
 
 @Resolver()
 export class UserResolver {
-  //   @Query(() => [Post])
-  //   posts(@Ctx() ctx: MyContext): Promise<Post[]> {
-  //     return ctx.em.find(Post, {});
-  //   }
-
-  //   @Query(() => Post, { nullable: true })
-  //   post(
-  //     @Arg("id", () => Int) id: number,
-  //     @Ctx() ctx: MyContext
-  //   ): Promise<Post | null> {
-  //     return ctx.em.findOne(Post, { id });
-  //   }
+  @Query(() => User, { nullable: true })
+  async me(@Ctx() { em, req }: MyContext) {
+    if (!req.session.UserID) {
+      return null;
+    }
+    const user = await em.findOne(User, { id: req.session.UserID });
+    return user;
+  }
 
   @Mutation(() => UserResponse)
   async register(
     @Arg("options") options: UsernamePasswordInput,
-    @Ctx() ctx: MyContext
+    @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     if (options.username.length < 2) {
       return {
@@ -66,12 +63,12 @@ export class UserResolver {
       };
     }
     const hashedPassword = await argon2.hash(options.password);
-    const user = ctx.em.create(User, {
+    const user = em.create(User, {
       username: options.username,
       password: hashedPassword,
     });
     try {
-      await ctx.em.persistAndFlush(user);
+      await em.persistAndFlush(user);
     } catch (error) {
       console.log(`error`, error.message);
       if (error.detail.includes("already exists")) {
@@ -85,6 +82,9 @@ export class UserResolver {
         };
       }
     }
+
+    req.session.UserID = user.id;
+
     return { user };
   }
 
