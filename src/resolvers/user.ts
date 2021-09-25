@@ -14,7 +14,19 @@ import argon2 from "argon2";
 import { COOKIE_NAME } from "../constants";
 
 @InputType()
-class UsernamePasswordInput {
+class RegisterInput {
+  @Field()
+  username: string;
+
+  @Field()
+  email?: string;
+
+  @Field()
+  password: string;
+}
+
+@InputType()
+class LoginInput {
   @Field()
   username: string;
 
@@ -53,7 +65,7 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async register(
-    @Arg("options") options: UsernamePasswordInput,
+    @Arg("options") options: RegisterInput,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     if (options.username.length < 2) {
@@ -63,9 +75,16 @@ export class UserResolver {
         ],
       };
     }
+
+    if (!options.email?.includes("@")) {
+      return {
+        errors: [{ field: "email", message: "Invalid email" }],
+      };
+    }
     const hashedPassword = await argon2.hash(options.password);
     const user = em.create(User, {
       username: options.username,
+      email: options.email,
       password: hashedPassword,
     });
     try {
@@ -91,7 +110,7 @@ export class UserResolver {
 
   @Mutation(() => UserResponse)
   async login(
-    @Arg("options") options: UsernamePasswordInput,
+    @Arg("options") options: LoginInput,
     @Ctx() { em, req }: MyContext
   ): Promise<UserResponse> {
     const user = await em.findOne(User, {
@@ -145,4 +164,13 @@ export class UserResolver {
       })
     );
   }
+
+  // @Mutation(() => Boolean)
+  // async forgotPassword(
+  //   @Arg("email") email: string,
+  //   @Ctx() { em, req }: MyContext
+  // ) {
+  //   // const user = await em.findOne(User,{email})
+  //   return true;
+  // }
 }

@@ -12,6 +12,10 @@ export class User {
   @Property({ unique: true })
   username!: string;
 
+  @Field()
+  @Property({ unique: true, nullable: true })
+  email: string;
+
   @Property()
   password!: string;
 
