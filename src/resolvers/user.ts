@@ -189,9 +189,60 @@ export class UserResolver {
 
     await sendEmail(
       email,
-      `<a href="http://localhost:3000/change-password/ ${token}">Change Password</a>`
+      `<a href="http://localhost:3000/change-password/${token}">Change Password</a>`
     );
 
     return true;
+  }
+
+  @Mutation(() => UserResponse)
+  async changePassword(
+    @Arg("token") token: string,
+    @Arg("password") password: string,
+    @Ctx() { em, req, redis }: MyContext
+  ): Promise<UserResponse> {
+    if (password.length < 2) {
+      return {
+        errors: [
+          {
+            field: "password",
+            message: "Password must be greater than 2",
+          },
+        ],
+      };
+    }
+    const userId = await redis.get(FORGET_PASSWORD_PREFFIX + token);
+
+    if (!userId) {
+      return {
+        errors: [
+          {
+            field: "token",
+            message: "Invalid token",
+          },
+        ],
+      };
+    }
+    const user = await em.findOne(User, { id: parseInt(userId, 10) });
+
+    if (!user) {
+      return {
+        errors: [
+          {
+            field: "token",
+            message: "User no longer exists",
+          },
+        ],
+      };
+    }
+
+    user.password = await argon2.hash(password);
+
+    em.persistAndFlush(user);
+
+    // optional
+    req.session.UserID = user.id;
+
+    return { user };
   }
 }
